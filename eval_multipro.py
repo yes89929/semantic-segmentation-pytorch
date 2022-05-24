@@ -19,7 +19,21 @@ from mit_semseg.lib.utils import as_numpy
 from PIL import Image
 from tqdm import tqdm
 
-colors = loadmat('data/color150.mat')['colors']
+from dataclasses import dataclass 
+from dataclass_csv import DataclassReader
+
+
+@dataclass
+class ClassInfo:
+    name:str
+    color:str
+    value:int
+
+def hex2rgb(hex:str):
+    hex = hex.lstrip('#')
+    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
+
+global colors
 
 
 def visualize_result(data, pred, dir_result):
@@ -123,6 +137,14 @@ def main(cfg, gpus):
     with open(cfg.DATASET.list_val, 'r') as f:
         lines = f.readlines()
         num_files = len(lines)
+
+    color_list = []
+    with open(f'{cfg.DATASET.root_dataset}/class_info.csv') as f:
+        class_infos = DataclassReader(f,ClassInfo)
+        for class_info in class_infos:
+            color_list.append(hex2rgb(class_info.color))
+    global colors
+    colors = np.asarray(color_list, np.uint8)
 
     num_files_per_gpu = math.ceil(num_files / len(gpus))
 

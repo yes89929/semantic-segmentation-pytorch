@@ -1,7 +1,9 @@
 # System libs
+from glob import glob
 import os
 import argparse
 from distutils.version import LooseVersion
+# from tkinter.font import names
 # Numerical libs
 import numpy as np
 import torch
@@ -18,14 +20,28 @@ from PIL import Image
 from tqdm import tqdm
 from mit_semseg.config import cfg
 
-colors = loadmat('data/color150.mat')['colors']
-names = {}
-with open('data/object150_info.csv') as f:
-    reader = csv.reader(f)
-    next(reader)
-    for row in reader:
-        names[int(row[0])] = row[5].split(";")[0]
+from dataclasses import dataclass 
+from dataclass_csv import DataclassReader
 
+# colors = loadmat('data/color150.mat')['colors']
+# names = {}
+# with open('data/object150_info.csv') as f:
+#     reader = csv.reader(f)
+#     next(reader)
+#     for row in reader:
+#         names[int(row[0])] = row[5].split(";")[0]
+
+@dataclass
+class ClassInfo:
+    name:str
+    color:str
+    value:int
+
+def hex2rgb(hex:str):
+    hex = hex.lstrip('#')
+    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
+
+global colors, names
 
 def visualize_result(data, pred, cfg):
     (img, info) = data
@@ -107,6 +123,17 @@ def main(cfg, gpu):
         use_softmax=True)
 
     crit = nn.NLLLoss(ignore_index=-1)
+
+    global names
+    names = {}
+    color_list = []
+    with open(f'{cfg.DATASET.root_dataset}/class_info.csv') as f:
+        class_infos = DataclassReader(f,ClassInfo)
+        for class_info in class_infos:
+            color_list.append(hex2rgb(class_info.color))
+            names[int(class_info.value)] = class_info.name
+    global colors
+    colors = np.asarray(color_list, np.uint8)
 
     segmentation_module = SegmentationModule(net_encoder, net_decoder, crit)
 
